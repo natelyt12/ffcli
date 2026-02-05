@@ -1,0 +1,14 @@
+{
+    "Nén video (dưới 5 phút)": {
+        "cmd": "-c:v libx264 -preset slow -crf 24 -r 60 -vf \"scale=-2:1080\" -c:a aac -b:a 128k",
+        "ext": ".mp4"
+    },
+    "Tăng âm lượng": {
+        "cmd": "-filter:a \"volume=30dB\" -c:v copy",
+        "ext": ".mp4"
+    },
+    "Nén ảnh": {
+        "cmd": "-q:v 5",
+        "ext": ".jpg"
+    }
+}
