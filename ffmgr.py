@@ -39,6 +39,9 @@ class Media:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "ffmpeg_commands.json")
 
+last_manual_cmd = ""
+last_manual_ext = ""
+
 def load_commands():
     commands = {}
     if os.path.exists(CONFIG_FILE):
@@ -66,15 +69,22 @@ def save_commands(commands):
         json.dump(commands, f, indent=4, ensure_ascii=False)
 
 def get_key():
-    """Chỉ dùng để điều hướng menu bằng phím mũi tên"""
+    """Đọc phím từ bàn phím hỗ trợ mũi tên, enter, backspace và ký tự"""
     if os.name == 'nt':
         import msvcrt
         key = msvcrt.getch()
         if key in (b'\x00', b'\xe0'):
             key = msvcrt.getch()
-            return {'H': 'up', 'P': 'down'}.get(key.decode(), None)
+            return {'H': 'up', 'P': 'down', 'K': 'left', 'M': 'right'}.get(key.decode(), None)
         if key == b'\r': return 'enter'
         if key == b'\x1b': return 'esc'
+        if key == b' ': return 'space'
+        if key == b'\x08': return 'backspace'
+        if key == b'\x03': raise KeyboardInterrupt
+        try:
+            char = key.decode('utf-8', 'ignore')
+            if char.isprintable(): return char
+        except: pass
     else:
         import tty, termios, select
         fd = sys.stdin.fileno()
@@ -85,77 +95,192 @@ def get_key():
             if ch == '\x1b':
                 if select.select([sys.stdin], [], [], 0.05)[0]:
                     ch2 = sys.stdin.read(2)
-                    return {'[A': 'up', '[B': 'down'}.get(ch2, None)
+                    return {'[A': 'up', '[B': 'down', '[C': 'right', '[D': 'left'}.get(ch2, None)
                 return 'esc'
             if ch == '\r': return 'enter'
+            if ch == ' ': return 'space'
+            if ch in ('\x08', '\x7f'): return 'backspace'
+            if ch == '\x03': raise KeyboardInterrupt
+            if ch.isprintable(): return ch
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return None
 
-def interactive_menu(title, options, subtitle=None, max_visible=None):
-    selected_index = 0
-    num_options = len(options)
-    limit = max_visible if max_visible is not None else max(num_options, 1)
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(UI.HIDE_CURSOR, end="")
-    try:
-        while True:
-            print(UI.HOME_CURSOR, end="") 
-            print(f"{UI.HEADER}{UI.BOLD}=== {title} ==={UI.END}\033[K")
-            if subtitle: print(f" {UI.GRAY}{subtitle}{UI.END}\033[K")
+def interactive_input(prompt, default_text=""):
+    text = list(default_text)
+    cursor_pos = len(text)
+    
+    print(UI.SHOW_CURSOR, end="")
+    while True:
+        display_text = "".join(text)
+        print(f"\r\033[K{prompt}{display_text}", end="")
+        
+        move_back = len(text) - cursor_pos
+        if move_back > 0:
+            print(f"\033[{move_back}D", end="")
             
+        sys.stdout.flush()
+        
+        key = get_key()
+        if key == 'enter':
+            print()
+            print(UI.HIDE_CURSOR, end="")
+            return "".join(text)
+        elif key == 'esc':
+            print()
+            print(UI.HIDE_CURSOR, end="")
+            return None
+        elif key == 'backspace':
+            if cursor_pos > 0:
+                text.pop(cursor_pos - 1)
+                cursor_pos -= 1
+        elif key == 'left':
+            if cursor_pos > 0:
+                cursor_pos -= 1
+        elif key == 'right':
+            if cursor_pos < len(text):
+                cursor_pos += 1
+        elif key == 'space':
+            text.insert(cursor_pos, ' ')
+            cursor_pos += 1
+        elif key and len(key) == 1:
+            text.insert(cursor_pos, key)
+            cursor_pos += 1
+
+def interactive_menu(title, options, subtitle=None, max_visible=None, multi_select=False, enable_search=False):
+    search_query = ""
+    selected_index = 0
+    selected_items = set()
+    
+    while True:
+        filtered_indices = []
+        for i, opt in enumerate(options):
+            if "---" in opt:
+                if not search_query: filtered_indices.append(i)
+                continue
+            if enable_search and search_query:
+                if search_query.lower() in opt.lower():
+                    filtered_indices.append(i)
+            else:
+                filtered_indices.append(i)
+                
+        num_options = len(filtered_indices)
+        if num_options == 0: selected_index = 0
+        elif selected_index >= num_options: selected_index = num_options - 1
+            
+        limit = max_visible if max_visible is not None else max(num_options, 1)
+        if limit < 5: limit = 5
+        
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(UI.HIDE_CURSOR, end="")
+        
+        print(f"{UI.HEADER}{UI.BOLD}=== {title} ==={UI.END}\033[K")
+        if subtitle: print(f" {UI.GRAY}{subtitle}{UI.END}\033[K")
+        
+        if enable_search:
+            print(f" {UI.YELLOW}🔍 Search:{UI.END} {search_query}█\033[K\n")
+        else:
+            print("\033[K")
+        
+        if num_options == 0:
+            print(f"    {UI.GRAY}No matches found.{UI.END}\033[K")
+        else:
             start_index = max(0, selected_index - limit // 2)
             end_index = start_index + limit
             if end_index > num_options:
                 end_index = num_options
                 start_index = max(0, end_index - limit)
                 
-            if start_index > 0:
-                print(f"    {UI.CYAN}▲{UI.END}\033[K")
-            else:
-                print("\033[K") # Dòng trắng thay cho khoảng trống của mũi tên
+            if start_index > 0: print(f"    {UI.CYAN}▲{UI.END}\033[K")
+            else: print("\033[K")
+            
+            for idx in range(start_index, end_index):
+                orig_idx = filtered_indices[idx]
+                option = options[orig_idx]
+                print('\033[K', end="")
                 
-            for i in range(start_index, end_index):
-                option = options[i]
-                print('\033[K', end="") # Xóa dòng hiện tại
                 if "---" in option:
                     print(f" {UI.GRAY} {option}{UI.END}")
                     continue
                 
+                prefix = ""
+                if multi_select:
+                    prefix = f"{UI.GREEN}[x]{UI.END} " if orig_idx in selected_items else f"{UI.GRAY}[ ]{UI.END} "
+                
                 disp_option = option
-                if i == selected_index:
+                if idx == selected_index:
                     if UI.END in disp_option:
                         disp_option = disp_option.replace(UI.END, UI.END + UI.SELECT)
-                    print(f" {UI.SELECT}➜  {disp_option}{UI.END}")
+                    print(f" {UI.SELECT}➜  {prefix}{disp_option}{UI.END}")
                 else:
                     if UI.END in disp_option:
                         disp_option = disp_option.replace(UI.END, UI.END + UI.WHITE)
-                    print(f"    {UI.WHITE}{disp_option}{UI.END}")
+                    print(f"    {prefix}{UI.WHITE}{disp_option}{UI.END}")
                     
-            if end_index < num_options:
-                print(f"    {UI.CYAN}▼{UI.END}\033[K")
-            else:
-                print("\033[K")
-                
-            scroll_info = f" | Showing {start_index+1}-{end_index} of {num_options}" if limit < num_options else ""
-            print(f"{UI.CYAN}(Arrows: Move, Enter: Select, Esc: Back){scroll_info}{UI.END}\033[K")
-            print('\033[J', end="") # Xoá các dòng cũ bên dưới
-            key = get_key()
-            if key == 'up':
+            if end_index < num_options: print(f"    {UI.CYAN}▼{UI.END}\033[K")
+            else: print("\033[K")
+            
+        scroll_info = f" | Showing {start_index+1}-{end_index} of {num_options}" if limit < num_options else ""
+        help_text = "Arrows: Move | Enter: Select | Esc: Back"
+        if multi_select: help_text += " | Space: Toggle"
+        if enable_search: help_text += " | Type to search"
+        
+        print(f"{UI.CYAN}({help_text}){scroll_info}{UI.END}\033[K")
+        print('\033[J', end="") 
+        
+        key = get_key()
+        if key == 'up':
+            if num_options > 0:
                 selected_index = (selected_index - 1) % num_options
-                if "---" in options[selected_index]: selected_index = (selected_index - 1) % num_options
-            elif key == 'down':
+                while "---" in options[filtered_indices[selected_index]]:
+                    selected_index = (selected_index - 1) % num_options
+        elif key == 'down':
+            if num_options > 0:
                 selected_index = (selected_index + 1) % num_options
-                if "---" in options[selected_index]: selected_index = (selected_index + 1) % num_options
-            elif key == 'enter':
-                print(UI.SHOW_CURSOR, end="")
-                return selected_index
-            elif key == 'esc':
-                print(UI.SHOW_CURSOR, end="")
+                while "---" in options[filtered_indices[selected_index]]:
+                    selected_index = (selected_index + 1) % num_options
+        elif key == 'space':
+            if multi_select and num_options > 0:
+                orig_idx = filtered_indices[selected_index]
+                if "---" not in options[orig_idx]:
+                    if orig_idx in selected_items: selected_items.remove(orig_idx)
+                    else: selected_items.add(orig_idx)
+            elif enable_search:
+                search_query += " "
+                selected_index = 0
+        elif key == 'enter':
+            print(UI.SHOW_CURSOR, end="")
+            if multi_select:
+                if not selected_items and num_options > 0:
+                    return [i for i in filtered_indices if "---" not in options[i]]
+                return list(selected_items)
+            else:
+                if num_options > 0:
+                    orig_idx = filtered_indices[selected_index]
+                    if "---" not in options[orig_idx]: return orig_idx
                 return -1
-    except Exception:
-        print(UI.SHOW_CURSOR, end="")
-        return -1
+        elif key == 'esc':
+            if enable_search and search_query:
+                search_query = ""
+                selected_index = 0
+            else:
+                print(UI.SHOW_CURSOR, end="")
+                return [] if multi_select else -1
+        elif key == 'backspace':
+            if enable_search:
+                search_query = search_query[:-1]
+                selected_index = 0
+        elif key and len(key) == 1:
+            if enable_search:
+                search_query += key
+                selected_index = 0
+            else:
+                if key.isdigit() or key.isalpha():
+                    for orig_idx in filtered_indices:
+                        opt_str = options[orig_idx].strip()
+                        if opt_str.lower().startswith(f"{key.lower()}.") or opt_str.lower().startswith(f"{key.lower()} "):
+                            print(UI.SHOW_CURSOR, end="")
+                            return orig_idx
 
 def get_ffprobe_info(filepath):
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -171,230 +296,181 @@ def open_file_default(filepath):
         else: subprocess.run(['xdg-open', filepath])
     except: pass
 
-def run_ffmpeg_flow(commands):
-    # Quét và lọc file media
+def run_process_flow(commands):
     all_files = [f for f in os.listdir('.') if os.path.isfile(f)]
     files = [f for f in all_files if os.path.splitext(f)[1].lower() in Media.ALL]
     
     if not files:
         os.system('cls' if os.name == 'nt' else 'clear')
         print(f"{UI.RED}No media files found in the current directory!{UI.END}")
-        print(f"{UI.GRAY}Only Video, Audio, and Image files are supported.{UI.END}")
         input("\nPress Enter to return...")
         return
 
-    # Tạo menu với nhãn phân loại
     menu_files = [f"{Media.get_label(f)} {f}" for f in files]
     
-    cwd = os.getcwd()
-    f_idx = interactive_menu("SELECT INPUT FILE", menu_files, subtitle=f"Scanning media in: {cwd}", max_visible=11)
-    if f_idx == -1: return
-    input_file = files[f_idx]
-
-    while True:
-        menu_options = [
-            "[Manual] Enter Custom Command",
-            "[Presets] Select Preset",
-            "--------------------------",
-            "View Info (ffprobe)",
-            "Preview",
-            "Delete File",
-            "--------------------------",
-            "Back"
-        ]
-        c_idx = interactive_menu(f"PROCESS: {input_file}", menu_options)
-        
-        if c_idx == -1 or menu_options[c_idx] == "Back": break
-        
-        action = menu_options[c_idx]
-        
-        if action == "[Presets] Select Preset":
-            cmd_names = list(commands.keys())
-            if not cmd_names:
-                print(f"{UI.RED}No presets found!{UI.END}")
-                input("Press Enter...")
-                continue
-            
-            p_opts = cmd_names + ["--------------------------", "Back"]
-            p_idx = interactive_menu("SELECT PRESET", p_opts)
-            if p_idx == -1 or p_opts[p_idx] == "Back": 
-                continue
-            action = cmd_names[p_idx]
-
-        if action == "View Info (ffprobe)":
-            get_ffprobe_info(input_file)
-            continue
-        elif action == "Preview":
-            open_file_default(input_file)
-            continue
-        elif action == "Delete File":
-            confirm = interactive_menu(f"DELETE PERMANENTLY: {input_file}?", ["No", "Yes, Delete"])
-            if confirm == 1:
-                os.remove(input_file)
-                return
-            continue
-        elif "---" in action: continue
-
-        # Xử lý nhập Command
-        if action == "[Manual] Enter Custom Command":
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print(f"{UI.YELLOW}Enter FFmpeg options (after -i input):{UI.END}")
-            print(f"{UI.CYAN}(Type 'exit' to go back){UI.END}")
-            cmd_template = input(f"{UI.BOLD}> {UI.END}").strip()
-            if cmd_template.lower() == 'exit': continue
-            
-            output_ext = input(f"{UI.YELLOW}Output extension (include dot, e.g. .mp4):{UI.END} ").strip()
-            if not output_ext: output_ext = os.path.splitext(input_file)[1]
-        else:
-            cmd_template = commands[action]["cmd"]
-            output_ext = commands[action]["ext"]
-            
-            # Hỏi xem có muốn xóa file sau khi chạy không
-            post_action = interactive_menu(f"PRESET: {action}", ["Run only", "Run then delete input file", "Back"])
-            if post_action == -1 or post_action == 2: continue
-            delete_after = (post_action == 1)
-
-        filename, old_ext = os.path.splitext(input_file)
-        # Nếu output_ext không bắt đầu bằng dấu chấm, thêm nó vào
-        if output_ext and not output_ext.startswith('.'): output_ext = '.' + output_ext
-        
-        output_file = f"{filename}_output{output_ext}"
-        os.system('cls' if os.name == 'nt' else 'clear')
-        final_cmd = f'ffmpeg -i "{input_file}" {cmd_template} "{output_file}"'
-        print(f"{UI.BLUE}Executing:{UI.END} {UI.YELLOW}{final_cmd}{UI.END}\n")
-        
-        result = subprocess.run(final_cmd, shell=True)
-        if result.returncode == 0:
-            print(f"\n{UI.GREEN}Success! Output: {output_file}{UI.END}")
-            if action != "[Manual] Enter Custom Command" and delete_after:
-                try:
-                    os.remove(input_file)
-                    print(f"{UI.RED}Deleted input file: {input_file}{UI.END}")
-                except Exception as e:
-                    print(f"{UI.RED}Error deleting file: {e}{UI.END}")
-        else:
-            print(f"\n{UI.RED}FFmpeg failed with return code {result.returncode}{UI.END}")
-            
-        input("Press Enter...")
-        break
-
-def run_batch_flow(commands):
-    all_files = [f for f in os.listdir('.') if os.path.isfile(f)]
-    video_files = [f for f in all_files if os.path.splitext(f)[1].lower() in Media.VIDEO]
-    audio_files = [f for f in all_files if os.path.splitext(f)[1].lower() in Media.AUDIO]
-    image_files = [f for f in all_files if os.path.splitext(f)[1].lower() in Media.IMAGE]
-
-    types_menu = []
-    types_map = []
-    if video_files:
-        types_menu.append(f"{UI.CYAN}[VIDEO] {len(video_files)} files{UI.END}")
-        types_map.append(("VIDEO", video_files))
-    if audio_files:
-        types_menu.append(f"{UI.GREEN}[AUDIO] {len(audio_files)} files{UI.END}")
-        types_map.append(("AUDIO", audio_files))
-    if image_files:
-        types_menu.append(f"{UI.YELLOW}[IMAGE] {len(image_files)} files{UI.END}")
-        types_map.append(("IMAGE", image_files))
-        
-    if not types_menu:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"{UI.RED}No media files found to batch process!{UI.END}")
-        input("\nPress Enter to return...")
-        return
-        
-    types_menu.extend(["--------------------------", "Back"])
-    types_map.extend([(None, None), (None, None)])
-        
-    t_idx = interactive_menu("SELECT MEDIA TYPE FOR BATCH PROCESS", types_menu)
-    if t_idx == -1 or types_menu[t_idx] == "Back" or "---" in types_menu[t_idx]: 
-        return
-        
-    sel_type, sel_files = types_map[t_idx]
+    subtitle = "Space: Toggle | Enter: Confirm (Hit Enter without selection = Select All Visible) | Type to search"
+    sel_indices = interactive_menu("SELECT MEDIA FILES", menu_files, subtitle=subtitle, multi_select=True, enable_search=True, max_visible=11)
     
+    if not sel_indices: return
+    sel_files = [files[i] for i in sel_indices]
+
     while True:
         menu_options = [
-            "[Manual] Enter Custom Command",
-            "[Presets] Select Preset",
-            "--------------------------",
-            "Back"
+            "1. [Manual] Enter Custom FFmpeg Command",
+            "2. [Presets] Select from Saved Presets",
+            "--------------------------"
         ]
-        c_idx = interactive_menu(f"BATCH PROCESS: {len(sel_files)} {sel_type} files", menu_options)
         
-        if c_idx == -1 or menu_options[c_idx] == "Back": break
+        if len(sel_files) == 1:
+            menu_options.extend([
+                "3. View Media Info (ffprobe)",
+                "4. Preview Media",
+                "--------------------------"
+            ])
+            
+        menu_options.append("0. Back")
+        
+        c_idx = interactive_menu(f"PROCESS: {len(sel_files)} file(s) selected", menu_options)
+        if c_idx == -1 or "0. Back" in menu_options[c_idx]: break
         
         action = menu_options[c_idx]
         if "---" in action: continue
         
-        if action == "[Presets] Select Preset":
+        if "View Info" in action:
+            get_ffprobe_info(sel_files[0])
+            continue
+        elif "Preview" in action:
+            open_file_default(sel_files[0])
+            continue
+
+        if "[Presets]" in action:
             cmd_names = list(commands.keys())
             if not cmd_names:
-                print(f"{UI.RED}No presets found!{UI.END}")
+                print(f"{UI.RED}No presets found! Please add one in 'Manage Presets'.{UI.END}")
                 input("Press Enter...")
                 continue
             
-            p_opts = cmd_names + ["--------------------------", "Back"]
-            p_idx = interactive_menu("SELECT PRESET FOR BATCH", p_opts)
-            if p_idx == -1 or p_opts[p_idx] == "Back": 
+            p_opts = cmd_names + ["--------------------------", "0. Back"]
+            p_idx = interactive_menu("SELECT PRESET", p_opts)
+            if p_idx == -1 or "Back" in p_opts[p_idx]: 
                 continue
-            action = cmd_names[p_idx]
+            preset_name = cmd_names[p_idx]
+            cmd_template = commands[preset_name]["cmd"]
+            output_ext = commands[preset_name]["ext"]
 
-        if action == "[Manual] Enter Custom Command":
+        elif "[Manual]" in action:
+            global last_manual_cmd, last_manual_ext
             os.system('cls' if os.name == 'nt' else 'clear')
-            print(f"{UI.YELLOW}Enter FFmpeg options (after -i input):{UI.END}")
-            print(f"{UI.CYAN}(Type 'exit' to go back){UI.END}")
-            cmd_template = input(f"{UI.BOLD}> {UI.END}").strip()
-            if cmd_template.lower() == 'exit': continue
+            print(f"{UI.HEADER}=== MANUAL COMMAND ==={UI.END}")
+            print(f"{UI.GRAY}Enter FFmpeg arguments that come AFTER the input file (-i).{UI.END}")
+            print(f"{UI.GRAY}Example: -c:v libx264 -crf 23 -c:a aac{UI.END}")
+            print(f"{UI.CYAN}(Esc or type 'exit' to cancel){UI.END}\n")
             
-            output_ext = input(f"{UI.YELLOW}Output extension (include dot, e.g. .mp4):{UI.END} ").strip()
-            post_action = interactive_menu(f"BATCH PROCESS", ["Run only", "Run then delete input files", "Back"])
-            if post_action == -1 or post_action == 2: continue
-            delete_after = (post_action == 1)
+            prompt1 = f"{UI.BOLD}Arguments > {UI.END}"
+            cmd_template = interactive_input(prompt1, last_manual_cmd)
+            if cmd_template is None or cmd_template.strip().lower() == 'exit': continue
+            
+            print()
+            prompt2 = f"{UI.BOLD}Output extension{UI.END} {UI.GRAY}(e.g. .mp4) [Leave blank to keep original]:{UI.END} "
+            output_ext = interactive_input(prompt2, last_manual_ext if last_manual_ext else ".")
+            if output_ext is None: continue
+            
+            cmd_template = cmd_template.strip()
+            output_ext = output_ext.strip()
+            last_manual_cmd = cmd_template
+            last_manual_ext = output_ext
+        
+        post_opts = ["1. Keep original files (Safe)", "2. Delete original files after SUCCESS", "0. Back"]
+        post_idx = interactive_menu("POST-PROCESS ACTION", post_opts)
+        if post_idx == -1 or post_opts[post_idx] == "0. Back": continue
+        delete_after = ("Delete" in post_opts[post_idx])
+
+        if len(sel_files) > 1:
+            thread_opts = ["1. Sequential (1 process at a time)", "2. Run 2 processes concurrently", "3. Run 3 processes concurrently", "4. Run 4 processes concurrently", "--------------------------", "0. Back"]
+            t_choice = interactive_menu("CONCURRENCY LEVEL", thread_opts)
+            if t_choice == -1 or "Back" in thread_opts[t_choice] or "---" in thread_opts[t_choice]: continue
+            max_workers = t_choice + 1
         else:
-            cmd_template = commands[action]["cmd"]
-            output_ext = commands[action]["ext"]
-            
-            post_action = interactive_menu(f"PRESET: {action} (BATCH)", ["Run only", "Run then delete input files", "Back"])
-            if post_action == -1 or post_action == 2: continue
-            delete_after = (post_action == 1)
+            max_workers = 1
 
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"{UI.HEADER}=== STARTING BATCH PROCESS ==={UI.END}\n")
+        print(f"{UI.HEADER}=== PROCESSING {len(sel_files)} FILE(S) ({max_workers} THREADS) ==={UI.END}\n")
+        if max_workers > 1: print(f"{UI.CYAN}Spawning FFmpeg windows. Please wait...{UI.END}\n")
         
         success_count = 0
         fail_count = 0
         
-        for input_file in sel_files:
+        import concurrent.futures
+        
+        active_processes = []
+        cancel_requested = [False]
+
+        def worker(input_file):
+            if cancel_requested[0]:
+                return False, input_file, "Cancelled"
+                
             filename, old_ext = os.path.splitext(input_file)
             cur_out_ext = output_ext if output_ext else old_ext
             if cur_out_ext and not cur_out_ext.startswith('.'): cur_out_ext = '.' + cur_out_ext
             
             output_file = f"{filename}_output{cur_out_ext}"
-            final_cmd = f'ffmpeg -i "{input_file}" {cmd_template} "{output_file}"'
             
-            print(f"\n{UI.BLUE}Processing:{UI.END} {input_file} -> {UI.YELLOW}{output_file}{UI.END}")
-            result = subprocess.run(final_cmd, shell=True)
-            if result.returncode == 0:
-                success_count += 1
-                if delete_after:
-                    try:
-                        os.remove(input_file)
-                        print(f" {UI.GRAY}Deleted: {input_file}{UI.END}")
-                    except Exception: pass
+            if os.name == 'nt':
+                final_cmd = f'ffmpeg -y -i "{input_file}" {cmd_template} "{output_file}"'
+                creationflags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0x00000010)
+                p = subprocess.Popen(final_cmd, shell=False, creationflags=creationflags)
             else:
-                fail_count += 1
-                print(f" {UI.RED}Failed to process: {input_file}{UI.END}")
-        
-        print(f"\n{UI.HEADER}=== BATCH COMPLETED ==={UI.END}")
-        print(f"Processed successfully: {UI.GREEN}{success_count}{UI.END} file(s).")
-        if fail_count > 0:
-            print(f"Failed: {UI.RED}{fail_count}{UI.END} file(s).")
+                final_cmd = f'ffmpeg -y -i "{input_file}" {cmd_template} "{output_file}"'
+                p = subprocess.Popen(final_cmd, shell=True)
+                
+            active_processes.append(p)
+            p.wait()
+            try: active_processes.remove(p)
+            except: pass
             
-        input("\nPress Enter to return...")
+            success = (p.returncode == 0)
+            
+            if success and delete_after:
+                try: os.remove(input_file)
+                except Exception: pass
+                
+            return success, input_file, output_file
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(worker, f): f for f in sel_files}
+                for future in concurrent.futures.as_completed(futures):
+                    success, in_f, out_f = future.result()
+                    if out_f == "Cancelled":
+                        continue
+                    if success:
+                        success_count += 1
+                        msg = f" {UI.GREEN}✓{UI.END} {in_f} -> {UI.YELLOW}{out_f}{UI.END}"
+                        if delete_after: msg += f" {UI.GRAY}(Deleted original){UI.END}"
+                        print(msg)
+                    else:
+                        fail_count += 1
+                        print(f" {UI.RED}✗ Failed:{UI.END} {in_f}")
+                        
+            print(f"\n{UI.HEADER}=== COMPLETED ==={UI.END}")
+            print(f"Processed successfully: {UI.GREEN}{success_count}{UI.END} file(s).")
+            if fail_count > 0:
+                print(f"Failed: {UI.RED}{fail_count}{UI.END} file(s).")
+                
+        except KeyboardInterrupt:
+            cancel_requested[0] = True
+            print(f"\n{UI.RED}Process Cancelled by User (Ctrl+C)! Killing ffmpeg tasks...{UI.END}")
+            for p in active_processes:
+                try: p.kill()
+                except: pass
+            print(f"{UI.RED}Batch process aborted.{UI.END}")
+            
+        input("\nPress Enter to return to main menu...")
         break
 
 def manage_commands(commands):
     while True:
-        opts = ["List saved commands", "Add new command", "Edit saved command", "Delete saved command", "--------------------------", "Back"]
+        opts = ["1. List saved commands", "2. Add new command", "3. Edit saved command", "4. Delete saved command", "--------------------------", "0. Back"]
         choice = interactive_menu("COMMAND MANAGEMENT", opts)
         
         if choice == 0:
@@ -403,7 +479,6 @@ def manage_commands(commands):
             if not commands:
                 print(f" {UI.GRAY}No presets found.{UI.END}")
             else:
-                # Tìm độ dài tên dài nhất để căn lề
                 max_name_len = max(len(k) for k in commands.keys()) if commands else 10
                 for k, v in commands.items(): 
                     name = f"{UI.CYAN}{UI.BOLD}{k.ljust(max_name_len)}{UI.END}"
@@ -412,7 +487,7 @@ def manage_commands(commands):
                     print(f" {name} {UI.GRAY}|{UI.END} {ext} {UI.GRAY}|{UI.END} {cmd}")
             input("\nPress Enter to return...")
             
-        elif choice == 1 or choice == 2: # Add (1) or Edit (2)
+        elif choice == 1 or choice == 2:
             is_edit = (choice == 2)
             old_name = ""
             data = {"cmd": "", "ext": ".mp4"}
@@ -428,7 +503,6 @@ def manage_commands(commands):
                 old_name = names[e_idx]
                 data = commands[old_name]
 
-            # Form fields definition
             fields = [
                 ("name", "Name", old_name if is_edit else "New Preset"),
                 ("cmd",  "Options", data["cmd"]),
@@ -444,24 +518,25 @@ def manage_commands(commands):
                 print(f"{UI.HEADER}{UI.BOLD}=== {title} ==={UI.END}")
                 print(f"{UI.CYAN}(Type 'exit' to cancel, Enter to keep/default){UI.END}\n")
                 
-                # Header
                 col_w = 20
                 col_c = 45
                 print(f" {UI.GRAY}{'FIELD'.ljust(col_w)} | {'CURRENT'.ljust(col_c)} | {'NEW VALUE'}{UI.END}")
                 print(f" {UI.GRAY}{'-'*col_w}-+-{'-'*col_c}-+-{'-'*25}{UI.END}")
                 
-                # Draw rows
                 for j, (f_key, f_label, f_curr) in enumerate(fields):
                     disp_curr = (f_curr[:42] + '..') if len(str(f_curr)) > 44 else str(f_curr)
                     
-                    if i == j: # Active field
-                        print(f" {UI.BOLD}{UI.YELLOW}➜ {f_label.ljust(col_w-2)}{UI.END} | {UI.WHITE}{disp_curr.ljust(col_c)}{UI.END} | ", end="")
-                        val = input().strip()
-                        if val.lower() == 'exit':
+                    if i == j:
+                        prompt_str = f" {UI.BOLD}{UI.YELLOW}➜ {f_label.ljust(col_w-2)}{UI.END} | {UI.WHITE}{disp_curr.ljust(col_c)}{UI.END} | "
+                        
+                        if f_key == "ext" and not f_curr: f_curr = "."
+                        
+                        val = interactive_input(prompt_str, f_curr if is_edit else ("." if f_key == "ext" else ""))
+                        if val is None or val.strip().lower() == 'exit':
                             cancelled = True
                             break
-                        new_values[f_key] = val if val else (f_curr if is_edit else ("" if f_key == "name" else f_curr))
-                    else: # Inactive field
+                        new_values[f_key] = val.strip() if val.strip() else (f_curr if is_edit else "")
+                    else:
                         val_done = new_values.get(f_key, "...")
                         print(f" {UI.GRAY}  {f_label.ljust(col_w-2)} | {disp_curr.ljust(col_c)} | {val_done}{UI.END}")
                 
@@ -479,26 +554,24 @@ def manage_commands(commands):
                     commands[final_name] = {"cmd": new_values["cmd"], "ext": ext or ".mp4"}
                     save_commands(commands)
         
-        elif choice == 3: # Delete
+        elif choice == 3:
             names = list(commands.keys())
             if not names:
                 print(f"{UI.RED}No presets to delete!{UI.END}")
                 input("Press Enter...")
                 continue
             
-            # Format menu options similar to List view
             max_name_len = max(len(k) for k in names)
             menu_options = []
             for k in names:
                 v = commands[k]
-                # Format: Name | Ext | Cmd (không dùng màu bên trong vì menu sẽ tô màu cả dòng)
                 line = f"{k.ljust(max_name_len)} | {v['ext'].rjust(5)} | {v['cmd'][:80]}..." if len(v['cmd']) > 80 else f"{k.ljust(max_name_len)} | {v['ext'].rjust(5)} | {v['cmd']}"
                 menu_options.append(line)
             
             d_idx = interactive_menu("SELECT PRESET TO DELETE", menu_options)
             if d_idx != -1:
                 target_name = names[d_idx]
-                confirm = interactive_menu(f"CONFIRM DELETE: {target_name}?", ["No, Cancel", "Yes, Delete It"])
+                confirm = interactive_menu(f"CONFIRM DELETE: {target_name}?", ["1. No, Cancel", "2. Yes, Delete It"])
                 if confirm == 1:
                     del commands[target_name]
                     save_commands(commands)
@@ -507,11 +580,15 @@ def manage_commands(commands):
 def main():
     commands = load_commands()
     while True:
-        choice = interactive_menu("FFmpeg Tool (by Natelyt)", ["Single File", "Batch Process", "Manage Presets", "--------------------------", "Exit"])
-        if choice == 0: run_ffmpeg_flow(commands)
-        elif choice == 1: run_batch_flow(commands)
-        elif choice == 2: manage_commands(commands)
-        elif choice == 4 or choice == -1: 
+        choice = interactive_menu("FFmpeg Tool (by Natelyt)", [
+            "1. Process Media", 
+            "2. Manage Presets", 
+            "--------------------------", 
+            "0. Exit"
+        ])
+        if choice == 0: run_process_flow(commands)
+        elif choice == 1: manage_commands(commands)
+        elif choice == 3 or choice == -1: 
             print(UI.SHOW_CURSOR, end="")
             os.system('cls' if os.name == 'nt' else 'clear')
             os._exit(0) # Buộc đóng terminal process
