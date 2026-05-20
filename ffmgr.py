@@ -3,17 +3,17 @@ import json
 import subprocess
 import sys
 
-# --- Bảng màu Pastel (Chỉ màu chữ) ---
+# --- Bảng màu Dracula Theme ---
 class UI:
-    HEADER = '\033[38;2;255;182;193m'
-    BLUE   = '\033[38;2;173;216;230m'
-    CYAN   = '\033[38;2;175;238;238m'
-    GREEN  = '\033[38;2;180;230;180m'
-    YELLOW = '\033[38;2;255;255;190m'
-    RED    = '\033[38;2;255;160;160m'
-    WHITE  = '\033[38;2;240;240;240m'
-    GRAY   = '\033[38;2;120;120;120m'
-    SELECT = '\033[1m\033[38;2;255;255;100m' # Yellow
+    HEADER = '\033[38;2;189;147;249m' # Purple
+    BLUE   = '\033[38;2;139;233;253m' # Cyan
+    CYAN   = '\033[38;2;139;233;253m' # Cyan
+    GREEN  = '\033[38;2;80;250;123m'  # Green
+    YELLOW = '\033[38;2;241;250;140m' # Yellow
+    RED    = '\033[38;2;255;85;85m'   # Red
+    WHITE  = '\033[38;2;248;248;242m' # Foreground
+    GRAY   = '\033[38;2;98;114;164m'  # Comment
+    SELECT = '\033[1m\033[38;2;255;121;198m' # Pink Bold
     END    = '\033[0m'
     BOLD   = '\033[1m'
     HIDE_CURSOR = '\033[?25l'
@@ -24,7 +24,7 @@ class UI:
 class Media:
     VIDEO = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp'}
     AUDIO = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.opus', '.wma'}
-    IMAGE = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.svg'}
+    IMAGE = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.svg', '.heic', '.heif'}
     ALL = VIDEO | AUDIO | IMAGE
 
     @staticmethod
@@ -147,7 +147,8 @@ def interactive_input(prompt, default_text=""):
             text.insert(cursor_pos, key)
             cursor_pos += 1
 
-def interactive_menu(title, options, subtitle=None, max_visible=None, multi_select=False, enable_search=False):
+def interactive_menu(title, options, subtitle=None, max_visible=None, multi_select=False, enable_search=False, toggle_groups=None):
+    if toggle_groups is None: toggle_groups = {}
     search_query = ""
     selected_index = 0
     selected_items = set()
@@ -168,7 +169,12 @@ def interactive_menu(title, options, subtitle=None, max_visible=None, multi_sele
         if num_options == 0: selected_index = 0
         elif selected_index >= num_options: selected_index = num_options - 1
             
+        try: term_lines = os.get_terminal_size().lines
+        except: term_lines = 24
+        
+        max_possible = max(5, term_lines - 8)
         limit = max_visible if max_visible is not None else max(num_options, 1)
+        if limit > max_possible: limit = max_possible
         if limit < 5: limit = 5
         
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -178,10 +184,10 @@ def interactive_menu(title, options, subtitle=None, max_visible=None, multi_sele
         if subtitle: print(f" {UI.GRAY}{subtitle}{UI.END}\033[K")
         
         if enable_search:
-            print(f" {UI.YELLOW}🔍 Search:{UI.END} {search_query}█\033[K\n")
-        else:
-            print("\033[K")
+            print(f" {UI.YELLOW}🔍 Search:{UI.END} {search_query}█\033[K")
         
+        start_index = 0
+        end_index = 0
         if num_options == 0:
             print(f"    {UI.GRAY}No matches found.{UI.END}\033[K")
         else:
@@ -205,7 +211,13 @@ def interactive_menu(title, options, subtitle=None, max_visible=None, multi_sele
                 
                 prefix = ""
                 if multi_select:
-                    prefix = f"{UI.GREEN}[x]{UI.END} " if orig_idx in selected_items else f"{UI.GRAY}[ ]{UI.END} "
+                    is_checked = False
+                    if orig_idx in toggle_groups:
+                        targets = toggle_groups[orig_idx]
+                        is_checked = all(t in selected_items for t in targets) and len(targets) > 0
+                    else:
+                        is_checked = orig_idx in selected_items
+                    prefix = f"{UI.GREEN}[x]{UI.END} " if is_checked else f"{UI.GRAY}[ ]{UI.END} "
                 
                 disp_option = option
                 if idx == selected_index:
@@ -243,17 +255,26 @@ def interactive_menu(title, options, subtitle=None, max_visible=None, multi_sele
             if multi_select and num_options > 0:
                 orig_idx = filtered_indices[selected_index]
                 if "---" not in options[orig_idx]:
-                    if orig_idx in selected_items: selected_items.remove(orig_idx)
-                    else: selected_items.add(orig_idx)
+                    if orig_idx in toggle_groups:
+                        targets = toggle_groups[orig_idx]
+                        all_selected = all(t in selected_items for t in targets) and len(targets) > 0
+                        if all_selected:
+                            for t in targets: selected_items.discard(t)
+                        else:
+                            for t in targets: selected_items.add(t)
+                    else:
+                        if orig_idx in selected_items: selected_items.remove(orig_idx)
+                        else: selected_items.add(orig_idx)
             elif enable_search:
                 search_query += " "
                 selected_index = 0
         elif key == 'enter':
-            print(UI.SHOW_CURSOR, end="")
+            print()
+            print(UI.HIDE_CURSOR, end="")
             if multi_select:
                 if not selected_items and num_options > 0:
-                    return [i for i in filtered_indices if "---" not in options[i]]
-                return list(selected_items)
+                    return [i for i in filtered_indices if "---" not in options[i] and i not in toggle_groups]
+                return [i for i in selected_items if i not in toggle_groups]
             else:
                 if num_options > 0:
                     orig_idx = filtered_indices[selected_index]
@@ -306,13 +327,36 @@ def run_process_flow(commands):
         input("\nPress Enter to return...")
         return
 
-    menu_files = [f"{Media.get_label(f)} {f}" for f in files]
+    menu_options = []
+    toggle_groups = {}
+    exts = sorted(list(set(os.path.splitext(f)[1].lower() for f in files)))
     
-    subtitle = "Space: Toggle | Enter: Confirm (Hit Enter without selection = Select All Visible) | Type to search"
-    sel_indices = interactive_menu("SELECT MEDIA FILES", menu_files, subtitle=subtitle, multi_select=True, enable_search=True, max_visible=11)
+    toggler_indices = []
+    for ext in exts:
+        count = sum(1 for f in files if os.path.splitext(f)[1].lower() == ext)
+        if count > 1:
+            menu_options.append(f"{UI.YELLOW}⬚ Select ALL {ext}{UI.END}")
+            toggler_indices.append(ext)
+            
+    if toggler_indices:
+        menu_options.append("--------------------------")
+        
+    file_start_idx = len(menu_options)
+    for f in files:
+        menu_options.append(f"{Media.get_label(f)} {f}")
+        
+    for i, ext in enumerate(toggler_indices):
+        target_indices = []
+        for j, f in enumerate(files):
+            if os.path.splitext(f)[1].lower() == ext:
+                target_indices.append(file_start_idx + j)
+        toggle_groups[i] = target_indices
+
+    subtitle = "Space: Toggle | Enter: Confirm (If 0 selected, ALL visible are chosen) | Type to search"
+    sel_indices = interactive_menu("SELECT MEDIA FILES", menu_options, subtitle=subtitle, multi_select=True, enable_search=True, toggle_groups=toggle_groups)
     
     if not sel_indices: return
-    sel_files = [files[i] for i in sel_indices]
+    sel_files = [files[i - file_start_idx] for i in sel_indices]
 
     while True:
         menu_options = [
@@ -343,6 +387,9 @@ def run_process_flow(commands):
             open_file_default(sel_files[0])
             continue
 
+        cmd_template = ""
+        output_ext = ""
+        
         if "[Presets]" in action:
             cmd_names = list(commands.keys())
             if not cmd_names:
@@ -580,12 +627,13 @@ def manage_commands(commands):
 def main():
     commands = load_commands()
     while True:
+        cwd = os.getcwd()
         choice = interactive_menu("FFmpeg Tool (by Natelyt)", [
             "1. Process Media", 
             "2. Manage Presets", 
             "--------------------------", 
             "0. Exit"
-        ])
+        ], subtitle=f"Currently in: {cwd}")
         if choice == 0: run_process_flow(commands)
         elif choice == 1: manage_commands(commands)
         elif choice == 3 or choice == -1: 
