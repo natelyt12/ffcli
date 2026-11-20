@@ -26,6 +26,37 @@ import ffcore
 IS_WINDOWS = os.name == "nt"
 INTERACTIVE = sys.stdin.isatty() and sys.stdout.isatty()
 
+
+def _enable_windows_vt():
+    """Enable ANSI escape sequences and UTF-8 output on Windows consoles."""
+    if not IS_WINDOWS:
+        return
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+    if not INTERACTIVE:
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        for std_handle in (-11, -12):
+            handle = kernel32.GetStdHandle(std_handle)
+            if handle in (0, -1):
+                continue
+            mode = ctypes.c_ulong()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+    except Exception:
+        pass
+
+
+_enable_windows_vt()
+
 ANSI_RE = re.compile(r"\033\[[0-9;?]*[a-zA-Z]")
 
 last_manual_args = ""
