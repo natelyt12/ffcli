@@ -3,114 +3,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ffcli · cut</title>
+  <title>ffcli cut</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="6" cy="6" r="2.6"></circle>
-        <circle cx="6" cy="18" r="2.6"></circle>
-        <path d="M8.1 7.6 20 19M8.1 16.4 20 5"></path>
-      </svg>
-      <span>ffcli</span>
-    </div>
-    <div class="fileinfo">
-      <span id="fileName" class="file-name">loading…</span>
-      <span id="fileMeta" class="file-meta"></span>
-    </div>
-    <button id="quitBtn" class="ghost" title="Stop the server and return to ffcli">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
-      <span>Exit</span>
-    </button>
-  </header>
-
-  <main>
-    <section id="videoPane" class="pane" hidden>
-      <video id="videoPlayer" controls preload="metadata"></video>
-    </section>
-
-    <section id="audioPane" class="pane" hidden>
-      <audio id="audioPlayer" controls preload="metadata"></audio>
-    </section>
-
-    <section class="timeline" id="timeline" title="Drag the handles, click to seek">
-      <canvas id="waveCanvas" hidden></canvas>
-      <div class="track" id="track"></div>
-      <div class="selection" id="selection"></div>
-      <div class="handle in" id="inHandle"><span>IN</span></div>
-      <div class="handle out" id="outHandle"><span>OUT</span></div>
-      <div class="cursor" id="cursor"></div>
-    </section>
-
-    <section class="controls">
-      <label class="field">
-        <span>In</span>
-        <input id="inInput" type="text" spellcheck="false" value="00:00:00.000">
-      </label>
-      <label class="field">
-        <span>Out</span>
-        <input id="outInput" type="text" spellcheck="false" value="00:00:00.000">
-      </label>
-      <div class="field">
-        <span>Length</span>
-        <output id="lengthText">00:00:00.000</output>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="6" cy="6" r="2.6"></circle>
+          <circle cx="6" cy="18" r="2.6"></circle>
+          <path d="M8.1 7.6 20 19M8.1 16.4 20 5"></path>
+        </svg>
+        <span class="brand-name">ffcli</span>
+        <span class="brand-tag">cut</span>
       </div>
-      <label class="field" id="modeField" hidden>
-        <span>Mode</span>
-        <select id="modeSelect">
-          <option value="copy">Stream copy (fast)</option>
-          <option value="encode">Re-encode (accurate)</option>
-          <option value="audio_only">Extract audio (MP3)</option>
-        </select>
-      </label>
-      <label class="field" id="formatField" hidden>
-        <span>Format</span>
-        <select id="formatSelect">
-          <option value="copy">Copy</option>
-          <option value="mp3">MP3 320k</option>
-          <option value="wav">WAV</option>
-          <option value="flac">FLAC</option>
-          <option value="aac">AAC 256k</option>
-        </select>
-      </label>
-      <label class="field" id="fadeInField" hidden>
-        <span>Fade in</span>
-        <input id="fadeInInput" type="number" min="0" step="0.1" value="0">
-      </label>
-      <label class="field" id="fadeOutField" hidden>
-        <span>Fade out</span>
-        <input id="fadeOutInput" type="number" min="0" step="0.1" value="0">
-      </label>
-    </section>
+      <div class="fileinfo">
+        <span id="fileName" class="file-name">loading…</span>
+        <span id="fileMeta" class="file-meta"></span>
+      </div>
+      <button id="quitBtn" class="ghost" title="Stop the local server and return to ffcli">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        <span>Exit</span>
+      </button>
+    </header>
 
-    <section class="footer">
-      <div class="output">
-        <span class="label">Output</span>
-        <code id="outputName">—</code>
-      </div>
-      <div class="progress" id="progressWrap">
-        <div class="bar" id="progressBar"></div>
-      </div>
-      <div class="status" id="statusText">Ready</div>
-      <div class="buttons">
-        <button id="cancelBtn" class="ghost" hidden>Cancel</button>
-        <button id="cutBtn" class="primary">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="6" cy="6" r="2.6"></circle>
-            <circle cx="6" cy="18" r="2.6"></circle>
-            <path d="M8.1 7.6 20 19M8.1 16.4 20 5"></path>
-          </svg>
-          <span>Cut</span>
-        </button>
-      </div>
-    </section>
-  </main>
+    <main>
+      <section id="videoPane" class="pane" hidden>
+        <video id="videoPlayer" controls preload="metadata"></video>
+      </section>
+
+      <section id="audioPane" class="pane audio-well" hidden>
+        <audio id="audioPlayer" controls preload="metadata"></audio>
+      </section>
+
+      <section class="timeline-deck">
+        <div class="timeline" id="timeline" title="Drag In/Out handles or click anywhere to seek">
+          <canvas id="waveCanvas" hidden></canvas>
+          <div class="track" id="track"></div>
+          <div class="trim-mask left" id="trimLeft"></div>
+          <div class="trim-mask right" id="trimRight"></div>
+          <div class="selection" id="selection"></div>
+          <div class="handle in" id="inHandle"><span>IN</span></div>
+          <div class="handle out" id="outHandle"><span>OUT</span></div>
+          <div class="cursor" id="cursor"></div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <label class="field">
+          <span>In point</span>
+          <input id="inInput" type="text" spellcheck="false" value="00:00:00.000">
+        </label>
+        <label class="field">
+          <span>Out point</span>
+          <input id="outInput" type="text" spellcheck="false" value="00:00:00.000">
+        </label>
+        <div class="field">
+          <span>Span</span>
+          <output id="lengthText">00:00:00.000</output>
+        </div>
+        <div class="controls-divider" aria-hidden="true"></div>
+        <label class="field" id="modeField" hidden>
+          <span>Mode</span>
+          <select id="modeSelect">
+            <option value="copy">Stream copy (fast)</option>
+            <option value="encode">Re-encode (accurate)</option>
+            <option value="audio_only">Extract audio (MP3)</option>
+          </select>
+        </label>
+        <label class="field" id="formatField" hidden>
+          <span>Format</span>
+          <select id="formatSelect">
+            <option value="copy">Copy</option>
+            <option value="mp3">MP3 320k</option>
+            <option value="wav">WAV</option>
+            <option value="flac">FLAC</option>
+            <option value="aac">AAC 256k</option>
+          </select>
+        </label>
+        <label class="field narrow" id="fadeInField" hidden>
+          <span>Fade in (s)</span>
+          <input id="fadeInInput" type="number" min="0" step="0.1" value="0">
+        </label>
+        <label class="field narrow" id="fadeOutField" hidden>
+          <span>Fade out (s)</span>
+          <input id="fadeOutInput" type="number" min="0" step="0.1" value="0">
+        </label>
+      </section>
+
+      <section class="footer">
+        <div class="output">
+          <span class="label">Output file</span>
+          <code id="outputName">—</code>
+        </div>
+        <div class="progress" id="progressWrap">
+          <div class="bar" id="progressBar"></div>
+        </div>
+        <div class="status" id="statusText">Ready</div>
+        <div class="buttons">
+          <button id="cancelBtn" class="ghost" hidden>Cancel</button>
+          <button id="cutBtn" class="primary">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="6" cy="6" r="2.6"></circle>
+              <circle cx="6" cy="18" r="2.6"></circle>
+              <path d="M8.1 7.6 20 19M8.1 16.4 20 5"></path>
+            </svg>
+            <span>Cut media</span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <div id="doneOverlay" class="overlay" hidden>
     <div class="card">
-      <svg class="done-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg>
+      <div class="done-badge">
+        <svg class="done-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"></path></svg>
+      </div>
       <h2>Cut complete</h2>
       <p id="doneText"></p>
       <p class="hint">Returning to ffcli…</p>

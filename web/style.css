@@ -1,19 +1,20 @@
 :root {
-  --stone-950: #0c0a09;
-  --stone-900: #1c1917;
-  --stone-850: #23201e;
-  --stone-800: #292524;
-  --stone-700: #44403c;
-  --stone-600: #57534e;
-  --stone-500: #78716c;
-  --stone-400: #a8a29e;
-  --stone-300: #d6d3d1;
-  --stone-200: #e7e5e4;
-  --accent: #b08d68;
-  --accent-soft: #7c6853;
-  --danger: #b0685f;
-  --radius: 10px;
-  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
+  --chassis: #14171a;
+  --well: #0d0f12;
+  --deck: #1b1f24;
+  --deck-raised: #22272e;
+  --hairline: #2a3038;
+  --hairline-strong: #3a424d;
+  --ink: #e6e9ed;
+  --ink-dim: #a5aeb9;
+  --ink-muted: #7c8591;
+  --signal: #e5a00d;
+  --signal-hover: #f2b429;
+  --signal-dim: rgba(229, 160, 13, 0.16);
+  --danger: #e05252;
+  --radius: 6px;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, "SF Mono", monospace;
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
 
 * {
@@ -31,13 +32,20 @@ body {
 
 body {
   margin: 0;
-  padding: 18px clamp(14px, 4vw, 44px) 26px;
-  background: var(--stone-950);
-  color: var(--stone-200);
-  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: clamp(14px, 2.5vw, 28px) clamp(14px, 4vw, 40px);
+  background: var(--chassis);
+  color: var(--ink);
+  font: 14px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 1120px;
+  height: 100%;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 svg {
@@ -45,7 +53,7 @@ svg {
   height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
   flex: none;
@@ -56,29 +64,46 @@ svg {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--stone-800);
+  gap: 18px;
+  padding: 10px 14px;
+  background: var(--deck);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
 }
 
 .brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--accent);
+  padding-right: 16px;
+  border-right: 1px solid var(--hairline);
+  color: var(--signal);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
+  letter-spacing: -0.01em;
 }
 
 .brand svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
+}
+
+.brand-name {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.brand-tag {
+  font: 500 11px/1 var(--mono);
+  color: var(--signal);
+  background: var(--signal-dim);
+  padding: 3px 6px;
+  border-radius: 4px;
 }
 
 .fileinfo {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
@@ -86,15 +111,18 @@ svg {
 .file-name {
   font-family: var(--mono);
   font-size: 13px;
-  color: var(--stone-100, #f5f5f4);
+  font-weight: 500;
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-meta {
-  font-size: 12px;
-  color: var(--stone-500);
+  font: 12px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
 /* --- buttons ------------------------------------------------------------ */
@@ -102,38 +130,56 @@ svg {
 button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 8px 14px;
+  height: 34px;
+  padding: 0 13px;
   border-radius: var(--radius);
-  border: 1px solid var(--stone-700);
-  background: var(--stone-850);
-  color: var(--stone-200);
-  font: inherit;
-  font-size: 13px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--deck-raised);
+  color: var(--ink);
+  font: 500 13px/1 var(--sans);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 button:hover:not(:disabled) {
-  background: var(--stone-800);
-  border-color: var(--stone-600);
+  background: #2b313a;
+  border-color: #4a5462;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
+button.ghost {
+  background: transparent;
+  border-color: var(--hairline);
+  color: var(--ink-dim);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--deck-raised);
+  color: var(--ink);
+}
+
 button.primary {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: #f7f3ee;
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #111316;
   font-weight: 600;
+  padding: 0 16px;
 }
 
 button.primary:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--stone-950);
+  background: var(--signal-hover);
+  border-color: var(--signal-hover);
 }
 
 /* --- main --------------------------------------------------------------- */
@@ -141,7 +187,7 @@ button.primary:hover:not(:disabled) {
 main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -151,31 +197,47 @@ main {
   display: flex;
   justify-content: center;
   flex: none;
+  background: var(--well);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .pane video {
   width: 100%;
-  max-height: 46vh;
-  border-radius: var(--radius);
+  max-height: 44vh;
+  display: block;
   background: #000;
-  border: 1px solid var(--stone-800);
+}
+
+.audio-well {
+  padding: 12px 14px;
+  background: var(--deck);
 }
 
 .pane audio {
   width: 100%;
-  height: 40px;
-  filter: invert(0.88) hue-rotate(180deg) saturate(0.6);
+  height: 38px;
+  filter: invert(0.9) hue-rotate(180deg) saturate(0.5);
 }
 
 /* --- timeline ----------------------------------------------------------- */
 
+.timeline-deck {
+  padding: 10px;
+  background: var(--deck);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  flex: none;
+}
+
 .timeline {
   position: relative;
-  height: 104px;
-  flex: none;
-  border-radius: var(--radius);
-  border: 1px solid var(--stone-800);
-  background: var(--stone-900);
+  height: 112px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+  background: var(--well);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   cursor: crosshair;
   user-select: none;
@@ -195,19 +257,40 @@ main {
   background: repeating-linear-gradient(
     90deg,
     transparent 0,
-    transparent 9.9%,
-    rgba(120, 113, 108, 0.16) 10%
+    transparent calc(10% - 1px),
+    rgba(124, 133, 145, 0.12) calc(10% - 1px),
+    rgba(124, 133, 145, 0.12) 10%
   );
+  pointer-events: none;
+}
+
+.trim-mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(13, 15, 18, 0.62);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.trim-mask.left {
+  left: 0;
+  width: 0;
+}
+
+.trim-mask.right {
+  right: 0;
+  width: 0;
 }
 
 .selection {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(176, 141, 104, 0.26), rgba(176, 141, 104, 0.12));
-  border-left: 1px solid var(--accent);
-  border-right: 1px solid var(--accent);
+  background: linear-gradient(180deg, rgba(229, 160, 13, 0.14), rgba(229, 160, 13, 0.04));
+  border-top: 2px solid rgba(229, 160, 13, 0.55);
   pointer-events: none;
+  z-index: 1;
 }
 
 .handle {
@@ -221,6 +304,7 @@ main {
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 6px;
+  z-index: 2;
 }
 
 .handle::before {
@@ -229,32 +313,36 @@ main {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--accent);
+  background: var(--signal);
 }
 
 .handle span {
   position: relative;
-  font: 600 9px/1 var(--mono);
-  letter-spacing: 0.08em;
-  color: var(--stone-950);
-  background: var(--accent);
-  padding: 3px 4px;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.06em;
+  color: #111316;
+  background: var(--signal);
+  padding: 3px 5px;
   border-radius: 3px;
 }
 
 .handle.out span {
-  background: var(--accent-soft);
-  color: #f7f3ee;
+  background: var(--ink);
+  color: #111316;
+}
+
+.handle.out::before {
+  background: var(--ink);
 }
 
 .cursor {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  margin-left: -1px;
-  background: #f5f5f4;
-  box-shadow: 0 0 6px rgba(12, 10, 9, 0.7);
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
   pointer-events: none;
   z-index: 3;
 }
@@ -262,14 +350,13 @@ main {
 .cursor::before {
   content: "";
   position: absolute;
-  top: 1px;
+  top: 0;
   left: 50%;
-  width: 11px;
-  height: 11px;
-  margin-left: -5.5px;
-  border-radius: 50%;
-  background: #f5f5f4;
-  box-shadow: 0 0 0 2px rgba(12, 10, 9, 0.55);
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  background: #ffffff;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
 /* --- controls ----------------------------------------------------------- */
@@ -277,27 +364,38 @@ main {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 20px;
+  gap: 12px 16px;
   align-items: flex-end;
   flex: none;
-  padding: 14px 16px;
-  border: 1px solid var(--stone-800);
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
   border-radius: var(--radius);
-  background: var(--stone-900);
+  background: var(--deck);
+}
+
+.controls-divider {
+  width: 1px;
+  height: 34px;
+  background: var(--hairline);
+  margin: 0 2px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 132px;
+  gap: 5px;
+  min-width: 138px;
+}
+
+.field.narrow {
+  min-width: 96px;
+  max-width: 112px;
 }
 
 .field > span {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--stone-500);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
 }
 
 .field input,
@@ -305,28 +403,27 @@ main {
 .field output {
   height: 34px;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--stone-700);
-  background: var(--stone-850);
-  color: var(--stone-200);
-  font: 13px var(--mono);
+  border-radius: 4px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--well);
+  color: var(--ink);
+  font: 13px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .field output {
   display: flex;
   align-items: center;
-  color: var(--stone-400);
-  border-style: dashed;
+  color: var(--signal);
+  border-style: solid;
+  border-color: var(--hairline);
+  background: rgba(13, 15, 18, 0.55);
 }
 
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: var(--accent);
-}
-
-.field input.wide {
-  min-width: 150px;
+  border-color: var(--signal);
 }
 
 /* --- footer ------------------------------------------------------------- */
@@ -339,10 +436,12 @@ main {
     "output buttons"
     "progress buttons"
     "status buttons";
-  gap: 8px 18px;
+  gap: 7px 18px;
   align-items: center;
-  padding-top: 14px;
-  border-top: 1px solid var(--stone-800);
+  padding: 12px 14px;
+  background: var(--deck);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
 }
 
 .output {
@@ -354,15 +453,15 @@ main {
 }
 
 .output .label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--stone-500);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  flex: none;
 }
 
 .output code {
-  font: 13px var(--mono);
-  color: var(--accent);
+  font: 500 13px var(--mono);
+  color: var(--signal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -370,25 +469,26 @@ main {
 
 .progress {
   grid-area: progress;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--stone-800);
+  height: 5px;
+  border-radius: 2px;
+  background: var(--well);
+  border: 1px solid var(--hairline);
   overflow: hidden;
 }
 
 .progress .bar {
   height: 100%;
   width: 0;
-  border-radius: 99px;
-  background: var(--accent);
-  transition: width 0.25s ease;
+  background: var(--signal);
+  transition: width 0.2s ease;
 }
 
 .status {
   grid-area: status;
-  font-size: 12px;
-  color: var(--stone-500);
-  min-height: 18px;
+  font: 12px/1.3 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  min-height: 16px;
 }
 
 .status.error {
@@ -410,8 +510,9 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(12, 10, 9, 0.86);
-  backdrop-filter: blur(2px);
+  background: rgba(13, 15, 18, 0.86);
+  backdrop-filter: blur(3px);
+  z-index: 20;
 }
 
 .overlay[hidden] {
@@ -419,43 +520,63 @@ main {
 }
 
 .card {
-  width: min(380px, 90vw);
-  padding: 26px;
-  border-radius: 14px;
-  border: 1px solid var(--stone-700);
-  background: var(--stone-900);
+  width: min(390px, 90vw);
+  padding: 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline-strong);
+  background: var(--deck);
   text-align: center;
 }
 
+.done-badge {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  background: var(--signal-dim);
+  border: 1px solid var(--signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .done-icon {
-  width: 34px;
-  height: 34px;
-  stroke: var(--accent);
-  stroke-width: 1.8;
-  margin-bottom: 6px;
+  width: 22px;
+  height: 22px;
+  stroke: var(--signal);
+  stroke-width: 2.2;
 }
 
 .card h2 {
-  margin: 6px 0 10px;
-  font-size: 17px;
+  margin: 4px 0 8px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--stone-200);
+  color: var(--ink);
 }
 
 .card p {
   margin: 0 0 6px;
   font: 13px var(--mono);
-  color: var(--accent);
+  color: var(--signal);
   word-break: break-all;
 }
 
 .card .hint {
-  font: 12px system-ui, sans-serif;
-  color: var(--stone-500);
+  font: 12px var(--sans);
+  color: var(--ink-muted);
   margin-bottom: 18px;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 720px) {
+  .fileinfo {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .controls-divider {
+    display: none;
+  }
+
   .footer {
     grid-template-columns: 1fr;
     grid-template-areas: "output" "progress" "status" "buttons";

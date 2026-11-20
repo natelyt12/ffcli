@@ -10,6 +10,8 @@ const ui = {
   audioPlayer: $("audioPlayer"),
   timeline: $("timeline"),
   waveCanvas: $("waveCanvas"),
+  trimLeft: $("trimLeft"),
+  trimRight: $("trimRight"),
   selection: $("selection"),
   inHandle: $("inHandle"),
   outHandle: $("outHandle"),
@@ -111,6 +113,8 @@ function percent(seconds) {
 function renderTimeline() {
   const startPct = percent(state.inTime);
   const endPct = percent(state.outTime);
+  if (ui.trimLeft) ui.trimLeft.style.width = `${startPct}%`;
+  if (ui.trimRight) ui.trimRight.style.width = `${Math.max(0, 100 - endPct)}%`;
   ui.selection.style.left = `${startPct}%`;
   ui.selection.style.width = `${Math.max(0, endPct - startPct)}%`;
   ui.inHandle.style.left = `${startPct}%`;
@@ -118,6 +122,7 @@ function renderTimeline() {
   ui.inInput.value = formatTime(state.inTime);
   ui.outInput.value = formatTime(state.outTime);
   ui.lengthText.textContent = formatTime(Math.max(0, state.outTime - state.inTime));
+  drawWaveform();
   moveCursor();
 }
 
@@ -180,18 +185,22 @@ function drawWaveform() {
 
   const peaks = state.peaks;
   if (!peaks.length) {
-    ctx.fillStyle = "rgba(120, 113, 108, 0.35)";
+    ctx.fillStyle = "rgba(124, 133, 145, 0.35)";
     ctx.fillRect(0, rect.height / 2 - 0.5, rect.width, 1);
     return;
   }
 
-  ctx.fillStyle = "rgba(168, 162, 158, 0.42)";
+  const inX = (percent(state.inTime) / 100) * rect.width;
+  const outX = (percent(state.outTime) / 100) * rect.width;
   const middle = rect.height / 2;
   const scale = rect.height * 0.44;
-  for (let x = 0; x < rect.width; x += 1) {
+  for (let x = 0; x < rect.width; x += 2) {
     const peak = peaks[Math.floor((x / rect.width) * peaks.length)] || 0;
     const height = Math.max(1, peak * scale);
-    ctx.fillRect(x, middle - height, 1, height * 2);
+    ctx.fillStyle = x >= inX && x <= outX
+      ? "rgba(229, 160, 13, 0.78)"
+      : "rgba(124, 133, 145, 0.28)";
+    ctx.fillRect(x, middle - height, 1.25, height * 2);
   }
 }
 
@@ -438,7 +447,7 @@ async function boot() {
   state.outTime = state.duration;
 
   ui.fileName.textContent = info.name;
-  ui.fileMeta.textContent = `${info.type.toUpperCase()} ${info.ext} · ${formatTime(state.duration)}`;
+  ui.fileMeta.textContent = `${info.type} (${info.ext})  ${formatTime(state.duration)}`;
 
   if (state.type === "video") {
     ui.videoPane.hidden = false;
